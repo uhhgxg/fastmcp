@@ -161,3 +161,29 @@ async def test_strict_validation_accepts_valid_nested_body_behind_ref() -> None:
         _spec_with_components(REF_SCHEMA), {"payload": {"count": 1}}, strict=True
     )
     assert [json.loads(r.content) for r in requests] == [{"payload": {"count": 1}}]
+
+
+ID_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "options": {
+            "$id": "https://schemas.example.com/options",
+            "$defs": {"Level": {"type": "integer", "minimum": 1}},
+            "type": "object",
+            "properties": {"level": {"$ref": "#/$defs/Level"}},
+            "required": ["level"],
+            "additionalProperties": False,
+        }
+    },
+    "required": ["options"],
+}
+
+
+async def test_strict_validation_accepts_property_schema_with_own_id() -> None:
+    """A property schema carrying its own ``$id`` and ``$defs`` is its own
+    schema resource: refs inside it must resolve in the subschema scope, not
+    against the tool schema root."""
+    requests = await _call_tool(
+        _spec(ID_SCHEMA), {"options": {"level": 3}}, strict=True
+    )
+    assert [json.loads(r.content) for r in requests] == [{"options": {"level": 3}}]

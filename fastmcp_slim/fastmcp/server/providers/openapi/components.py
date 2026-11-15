@@ -263,9 +263,16 @@ class OpenAPITool(Tool):
                 schema = properties.get(name)
                 if schema is None:
                     continue
-                errors = list(
-                    root_validator.evolve(schema=schema).iter_errors(arguments[name])
+                # A property schema that declares its own ``$id`` is a separate
+                # schema resource: refs inside it resolve in the subschema scope,
+                # not against the tool schema root. Validate it as its own root
+                # document instead of reusing the root resolver.
+                validator = (
+                    Draft202012Validator(schema)
+                    if "$id" in schema
+                    else root_validator.evolve(schema=schema)
                 )
+                errors = list(validator.iter_errors(arguments[name]))
                 if errors:
                     details = "; ".join(
                         f"{error.json_path}: {error.message}" for error in errors[:3]
